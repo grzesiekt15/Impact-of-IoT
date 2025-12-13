@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv
+
+# Create an isolated virtual environment to avoid Debian's externally managed pip protections
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+WORKDIR /app
+COPY coap_server.py .
+
+RUN pip install --no-cache-dir aiocoap
+
+EXPOSE 5683/udp
+
+CMD ["python","-u","coap_server.py"]
