@@ -6,7 +6,8 @@ services:
     ports:
       - "1883:1883"
     volumes:
-      - ./mosquitto-no-tls.conf:/mosquitto/config/mosquitto.conf
+      - ./configs/mosquitto-no-tls.conf:/mosquitto/config/mosquitto.conf:ro
+
     restart: unless-stopped
 
   http-server:
@@ -15,7 +16,7 @@ services:
     working_dir: /app
     volumes:
       - .:/app
-    command: sh -c "pip install flask && python -u http_server.py"
+    command: sh -c "pip install flask && python -u servers/http_server.py"
     ports:
       - "5000:5000"
     restart: unless-stopped
@@ -28,7 +29,14 @@ services:
     ports:
       - "5683:5683/udp"
     restart: unless-stopped
+  
+  iot-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    image: iot-client:latest
+    #profiles: ["tools"]
 
-volumes:
-  mosq_data:
-  mosq_log:
+# volumes:
+#   mosq_data:
+#   mosq_log:

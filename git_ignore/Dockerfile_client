@@ -4,4 +4,4 @@ COPY client/protocol_client.py .
 COPY client/write_results.py .
 # use last asyncio-mqtt version with stable API; new aiomqtt 1.x breaks our client
 RUN pip install "paho-mqtt==1.6.1" "asyncio-mqtt==0.12.1" aiocoap requests
-CMD ["python","-u","/app/protocol_client.py"]
+CMD ["python","client/protocol_client.py"]

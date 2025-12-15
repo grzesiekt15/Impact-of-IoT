@@ -10,8 +10,8 @@ OWNER_GROUP=$(id -gn "$OWNER" 2>/dev/null || echo "$OWNER")
 mkdir -p $LOGDIR
 
 # clear old clients and start new
-./stop_clients.sh
-./start_clients.sh $N $PROTO 1
+./scripts/stop_clients.sh
+./scripts/start_clients.sh $N $PROTO 1 "$OUT"
 
 # start capture (tshark) on all interfaces into pcap
 PCAP_FILE=$LOGDIR/${OUT}_N${N}_${PROTO}.pcap
@@ -40,7 +40,7 @@ for i in $(seq 1 $N); do
 done
 
 # stop clients
-./stop_clients.sh
+./scripts/stop_clients.sh
 
 # ensure current user can read the artifacts (pcaps owned by root otherwise)
 chown -R "$OWNER":"$OWNER_GROUP" "$LOGDIR"
