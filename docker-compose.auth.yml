@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  mqtt-broker:
+    volumes:
+      - ./configs/mosquitto-auth.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./configs/passwords:/mosquitto/config/passwords:ro
+
+  http-server:
+    environment:
+      - AUTH_MODE=auth
+      - API_TOKEN=supersekret123
+
+  coap-server:
+    environment:
+      - AUTH_MODE=auth
+      - API_TOKEN=supersekret123

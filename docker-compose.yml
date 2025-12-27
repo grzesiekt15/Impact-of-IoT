@@ -14,6 +14,8 @@ services:
     image: python:3.11-slim
     container_name: http-server
     working_dir: /app
+    environment:
+      - AUTH_MODE=open
     volumes:
       - .:/app
     command: sh -c "pip install flask && python -u servers/http_server.py"
@@ -26,6 +28,8 @@ services:
       context: .
       dockerfile: Dockerfile.coap
     container_name: coap-server
+    environment:
+      - AUTH_MODE=open
     ports:
       - "5683:5683/udp"
     restart: unless-stopped

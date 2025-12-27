@@ -10,7 +10,8 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 WORKDIR /app
 COPY servers/ /app/servers/
 
-RUN pip install --no-cache-dir aiocoap
+# aiocoap + python-dotenv (requirement in servers/coap_server.py)
+RUN pip install --no-cache-dir aiocoap python-dotenv
 
 EXPOSE 5683/udp
 

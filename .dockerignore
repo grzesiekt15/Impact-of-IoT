@@ -1,0 +1,5 @@
+# Ignore files not needed for builds / avoid permission issues
+results/
+configs/passwords
+.git
+.gitignore

@@ -1,0 +1,12 @@
+# Local env/secrets
+configs/.env.*
+configs/passwords
+
+# Generated results and captures
+results/
+results_*/
+
+# Editor/OS clutter
+*.pyc
+__pycache__/
+.DS_Store

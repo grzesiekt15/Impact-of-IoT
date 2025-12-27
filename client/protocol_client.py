@@ -3,6 +3,14 @@ import asyncio, os, time, json, sys
 from asyncio_mqtt import Client
 
 from write_results import write_metric
+import os
+# from dotenv import load_dotenv
+
+# load_dotenv()
+API_TOKEN = os.environ.get("API_TOKEN")
+AUTH_MODE = os.environ.get("AUTH_MODE")
+MQTT_USER = os.environ.get("MQTT_USER")
+MQTT_PASS = os.environ.get("MQTT_PASS")
 
 ID = os.environ.get("ID", "1")
 FREQ = float(os.environ.get("FREQ", "1.0"))
@@ -32,7 +40,10 @@ def http_loop():
         payload = {"id": ID, "ts": time.time(), "val": 42}
         t0 = time.time()
         try:
-            r = requests.post(HTTP_URL, json=payload, timeout=5)
+            headers = {}
+            if AUTH_MODE == "auth":
+                headers["Authorization"] = f"Bearer {API_TOKEN}"
+            r = requests.post(HTTP_URL, json=payload, headers=headers, timeout=5)
             t1 = time.time()
             rtt = t1 - t0
             log(f"METRIC RTT http id={ID} ts={t1:.6f} rtt={rtt:.6f} status={r.status_code}")
@@ -63,6 +74,8 @@ def mqtt_loop():
             emit(time.time(), error=str(e))
 
     client = mqtt.Client()
+    if AUTH_MODE == "auth":
+        client.username_pw_set(MQTT_USER, MQTT_PASS) 
     client.on_connect = on_connect
     client.on_message = on_message
     client.reconnect_delay_set(min_delay=1, max_delay=5)
@@ -91,10 +104,14 @@ def mqtt_loop():
 async def coap_loop():
     from aiocoap import Message, Context, Code
     protocol = await Context.create_client_context()
-    uri = f"coap://{COAP_HOST}:{COAP_PORT}/{COAP_RESOURCE}"
-    log(f"COAP LOOP START id={ID} uri={uri}")
+    base_uri = f"coap://{COAP_HOST}:{COAP_PORT}/{COAP_RESOURCE}"
+    log(f"COAP LOOP START id={ID} uri={base_uri}")
     while True:
         payload = {"id": ID, "ts": time.time(), "val": 42}
+        uri = base_uri
+        if AUTH_MODE == "auth" and API_TOKEN:
+            uri = f"{base_uri}?token={API_TOKEN}"
+
         request = Message(code=Code.POST, uri=uri, payload=json.dumps(payload).encode())
         t0 = time.time()
         try:

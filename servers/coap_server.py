@@ -6,6 +6,11 @@ import sys
 import time
 
 from aiocoap import Message, Context, resource, Code, error as aiocoap_error
+from dotenv import load_dotenv
+
+load_dotenv()
+AUTH_MODE = os.environ.get("AUTH_MODE", "open")
+API_TOKEN = os.environ.get("API_TOKEN", "")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -15,6 +20,17 @@ class SensorResource(resource.Resource):
         payload = request.payload.decode() if request.payload else ""
         try:
             data = json.loads(payload)
+            if AUTH_MODE == "auth":
+                q = (request.opt.uri_query or [])
+                token = ""
+                for item in q:
+                    if item.startswith("token="):
+                        token = item.split("=", 1)[1]
+                        break
+                if token != API_TOKEN:
+                    logging.info("Unauthorized CoAP (bad token)")
+                    return Message(code=Code.UNAUTHORIZED, payload=b"UNAUTHORIZED")
+
         except Exception:
             data = payload
         logging.info("Received CoAP POST: %s", data)
