@@ -20,11 +20,16 @@ HTTP_URL = os.environ.get("HTTP_URL", "http://127.0.0.1:5000/post")
 COAP_HOST = os.environ.get("COAP_HOST", "127.0.0.1")
 COAP_PORT = int(os.environ.get("COAP_PORT", "5683"))
 COAP_RESOURCE = os.environ.get("COAP_RESOURCE", "sensors")
+MAX_SAMPLES = int(os.environ.get("MAX_SAMPLES", "0"))
 
 # wyniki
 RUN_ID = os.environ.get("RUN_ID", "run")
 OUT_DIR = os.environ.get("OUT_DIR", "/results")
 CSV_PATH = os.path.join(OUT_DIR, f"metrics_{RUN_ID}_{PROTO}_id{ID}.csv")
+START_FILE = os.environ.get("START_FILE")
+START_FILE_TIMEOUT = float(os.environ.get("START_FILE_TIMEOUT", "300"))
+READY_FILE = os.environ.get("READY_FILE")
+STOP_FILE = os.environ.get("STOP_FILE")
 
 def log(*args, **kwargs):
     print(*args, **kwargs)
@@ -33,10 +38,44 @@ def log(*args, **kwargs):
 def emit(ts, rtt=None, status="", error=""):
     write_metric(CSV_PATH, RUN_ID, PROTO, ID, ts, rtt=rtt, status=status, error=error)
 
+def write_ready_file():
+    if not READY_FILE:
+        return
+    try:
+        with open(READY_FILE, "w", encoding="utf-8") as f:
+            f.write(f"{ID}\\n")
+        log(f"READY_FILE written: {READY_FILE}")
+    except Exception as e:
+        log(f"READY_FILE write failed: {e}")
+
+def wait_for_start_file():
+    if not START_FILE:
+        return
+    log(f"WAIT FOR START_FILE={START_FILE} timeout={START_FILE_TIMEOUT}s")
+    start = time.time()
+    while True:
+        if os.path.exists(START_FILE):
+            log("START_FILE detected, begin traffic")
+            return
+        if START_FILE_TIMEOUT > 0 and time.time() - start > START_FILE_TIMEOUT:
+            log("START_FILE timeout, begin traffic anyway")
+            return
+        time.sleep(0.2)
+
+def should_stop() -> bool:
+    return bool(STOP_FILE) and os.path.exists(STOP_FILE)
+
 def http_loop():
     import requests
     log(f"HTTP LOOP START id={ID} url={HTTP_URL}")
+    samples = 0
     while True:
+        if should_stop():
+            log(f"HTTP LOOP STOP id={ID} stop_file={STOP_FILE}")
+            return
+        if MAX_SAMPLES > 0 and samples >= MAX_SAMPLES:
+            log(f"HTTP LOOP DONE id={ID} samples={samples}")
+            return
         payload = {"id": ID, "ts": time.time(), "val": 42}
         t0 = time.time()
         try:
@@ -51,6 +90,7 @@ def http_loop():
         except Exception as e:
             log(f"ERR HTTP id={ID} {e}")
             emit(time.time(), error=str(e))
+        samples += 1
         time.sleep(FREQ)
 
 def mqtt_loop():
@@ -58,6 +98,7 @@ def mqtt_loop():
 
     topic = f"sensors/{ID}"
     log(f"MQTT LOOP START id={ID} broker={BROKER}")
+    samples = 0
 
     def on_connect(client, userdata, flags, rc):
         client.subscribe(topic)
@@ -93,11 +134,22 @@ def mqtt_loop():
     client.loop_start()
 
     while True:
+        if should_stop():
+            log(f"MQTT LOOP STOP id={ID} stop_file={STOP_FILE}")
+            client.loop_stop()
+            client.disconnect()
+            return
+        if MAX_SAMPLES > 0 and samples >= MAX_SAMPLES:
+            log(f"MQTT LOOP DONE id={ID} samples={samples}")
+            client.loop_stop()
+            client.disconnect()
+            return
         t0 = time.time()
         info = client.publish(topic, json.dumps({"id": ID, "t0": t0}))
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
             log(f"MQTT publish failed id={ID} rc={info.rc}")
             emit(time.time(), error=f"mqtt_publish_failed:{info.rc}")
+        samples += 1
         time.sleep(FREQ)
 
 
@@ -106,7 +158,14 @@ async def coap_loop():
     protocol = await Context.create_client_context()
     base_uri = f"coap://{COAP_HOST}:{COAP_PORT}/{COAP_RESOURCE}"
     log(f"COAP LOOP START id={ID} uri={base_uri}")
+    samples = 0
     while True:
+        if should_stop():
+            log(f"COAP LOOP STOP id={ID} stop_file={STOP_FILE}")
+            return
+        if MAX_SAMPLES > 0 and samples >= MAX_SAMPLES:
+            log(f"COAP LOOP DONE id={ID} samples={samples}")
+            return
         payload = {"id": ID, "ts": time.time(), "val": 42}
         uri = base_uri
         if AUTH_MODE == "auth" and API_TOKEN:
@@ -123,10 +182,13 @@ async def coap_loop():
         except Exception as e:
             log(f"ERR COAP id={ID} {e}")
             emit(time.time(), error=str(e))
+        samples += 1
         await asyncio.sleep(FREQ)
 
 if __name__ == "__main__":
     log(f"CLIENT START id={ID} proto={PROTO} freq={FREQ} run_id={RUN_ID} out={OUT_DIR}")
+    write_ready_file()
+    wait_for_start_file()
 
     if PROTO == "http":
         http_loop()

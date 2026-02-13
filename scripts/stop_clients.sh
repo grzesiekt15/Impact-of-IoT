@@ -1,6 +1,7 @@
 #!/bin/bash
 # Stop and remove only IoT client containers
-for c in $(docker ps -a --filter "name=client_" -q); do
+DOCKER_BIN=${DOCKER_BIN:-docker}
+for c in $($DOCKER_BIN ps -a --filter "name=client_" -q); do
     echo "Removing container $c"
-    docker rm -f $c
+    $DOCKER_BIN rm -f $c
 done
